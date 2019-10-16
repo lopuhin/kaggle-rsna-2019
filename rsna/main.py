@@ -1,4 +1,5 @@
 import argparse
+import random
 from typing import Tuple
 
 import torch
@@ -18,7 +19,12 @@ class Dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         w, h = self.size
-        return torch.randn(3, h, w, dtype=torch.float32), 0
+        x = torch.randn(3, h, w, dtype=torch.float32)
+        y = random.randint(0, 100)
+        x0 = (y % 10) * (w // 10)
+        y0 = (y // 10) * (h // 10)
+        x[:, y0: y0 + h // 10, x0: x0 + w // 10] = 1
+        return x, y
 
 
 def main():
@@ -26,7 +32,7 @@ def main():
     arg = parser.add_argument
     arg('--model', default='resnet50')
     arg('--device', default='cpu', choices=['cpu', 'cuda', 'tpu'])
-    arg('--lr', type=float, default=0.01)
+    arg('--lr', type=float, default=0.001)
     arg('--batch-size', type=int, default=16)
     arg('--image-size', type=lambda x: tuple(x.split('x')), default=(512, 512))
     arg('--epoch-size', type=int, default=10000)
