@@ -6,7 +6,6 @@ import torch
 from torch import nn, optim
 import torch.utils.data
 from torchvision import models
-import tqdm
 
 
 class Dataset(torch.utils.data.Dataset):
@@ -42,16 +41,17 @@ def main():
     args = parser.parse_args()
     if args.device == 'tpu':
         import torch_xla.distributed.xla_multiprocessing as xmp
-        xmp.spawn(_worker, args=(args))
+        xmp.spawn(_worker, args=(args,))
     else:
-        _worker(args)
+        _worker(0, args)
 
 
-def _worker(args):
+def _worker(index, args):
     if args.device == 'cuda':
         torch.backends.cudnn.benchmark = True
     on_tpu = args.device == 'tpu'
     if on_tpu:
+        print(f'started worker {index}')
         import torch_xla.core.xla_model as xm
         device = xm.xla_device()
     else:
@@ -65,10 +65,6 @@ def _worker(args):
         num_workers=args.workers,
         drop_last=True,
     )
-    if on_tpu:
-        import torch_xla.distributed.parallel_loader as pl
-        para_loader = pl.ParallelLoader(loader, [device])
-        loader = para_loader.per_device_loader(device)
 
     model = getattr(models, args.model)()
     model.to(device)
@@ -77,8 +73,15 @@ def _worker(args):
 
     def train():
         model.train()
-        pbar = tqdm.tqdm(loader)
-        for i, (x, y) in enumerate(pbar):
+        if on_tpu:
+            import torch_xla.distributed.parallel_loader as pl
+            para_loader = pl.ParallelLoader(loader, [device])
+            # would need enumerate in xla>0.5
+            i_loader = para_loader.per_device_loader(device)
+        else:
+            i_loader = enumerate(loader)
+        for i, (x, y) in i_loader:
+            print(f'[{device}] {i}')  # TODO timings
             x = x.to(device)
             y = y.to(device)
             y_pred = model(x)
@@ -90,7 +93,7 @@ def _worker(args):
             else:
                 optimizer.step()
             if i % args.report_each == 0:
-                pbar.set_postfix(loss=f'{loss:.4f}')
+                print(f'[{device}] loss={loss:.4f}')
 
     try:
         train()
