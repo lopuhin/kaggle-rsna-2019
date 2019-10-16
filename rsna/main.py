@@ -38,6 +38,7 @@ def main():
     arg('--epoch-size', type=int, default=10000)
     arg('--workers', type=int, default=2)
     arg('--report-each', type=int, default=10)
+    arg('--tpu-metrics', action='store_true')
     args = parser.parse_args()
 
     if args.device == 'cuda':
@@ -62,20 +63,31 @@ def main():
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
 
-    model.train()
-    pbar = tqdm.tqdm(loader)
-    for i, (x, y) in enumerate(pbar):
-        x = x.to(device)
-        y = y.to(device)
-        y_pred = model(x)
-        loss = criterion(y_pred, y)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        if on_tpu:
-            xm.optimizer_step(optimizer, barrier=True)
-        if i % args.report_each == 0:
-            pbar.set_postfix(loss=f'{loss:.4f}')
+    def train():
+        model.train()
+        pbar = tqdm.tqdm(loader)
+        for i, (x, y) in enumerate(pbar):
+            x = x.to(device)
+            y = y.to(device)
+            y_pred = model(x)
+            loss = criterion(y_pred, y)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            if on_tpu:
+                xm.optimizer_step(optimizer, barrier=True)
+            if i % args.report_each == 0:
+                pbar.set_postfix(loss=f'{loss:.4f}')
+
+    try:
+        train()
+    except KeyboardInterrupt:
+        print('Ctrl+C pressed, interrupting...')
+    finally:
+        if on_tpu and args.tpu_metrics:
+            import torch_xla.debug.metrics as met
+            print('\nTPU metrics report:')
+            print(met.metrics_report())
 
 
 if __name__ == '__main__':
