@@ -25,7 +25,7 @@ def main():
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
     arg('--model', default='resnet50')
-    arg('--device', default='cpu', choices=['cpu', 'cuda'])
+    arg('--device', default='cpu', choices=['cpu', 'cuda', 'tpu'])
     arg('--lr', type=float, default=0.01)
     arg('--batch-size', type=int, default=16)
     arg('--image-size', type=lambda x: tuple(x.split('x')), default=(512, 512))
@@ -33,7 +33,14 @@ def main():
     arg('--workers', type=int, default=2)
     args = parser.parse_args()
 
-    device = torch.device(args.device)
+    on_tpu = args.device == 'tpu'
+    if on_tpu:
+        import torch_xla.core.xla_model as xm
+        device = xm.xla_device()
+    else:
+        device = torch.device(args.device)
+    print(f'using device {device}')
+
     dataset = Dataset(size=args.image_size, n=args.epoch_size)
     loader = torch.utils.data.DataLoader(
         dataset,
@@ -54,6 +61,8 @@ def main():
         y_pred = model(x)
         loss = criterion(y_pred, y)
         loss.backward()
+        if on_tpu:
+            xm.optimizer_step(optimizer, barrier=True)
         if i % 10 == 0:
             pbar.set_postfix(loss=f'{loss:.4f}')
 
