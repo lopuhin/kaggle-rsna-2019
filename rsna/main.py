@@ -40,6 +40,8 @@ def main():
     arg('--report-each', type=int, default=10)
     args = parser.parse_args()
 
+    if args.device == 'cuda':
+        torch.backends.cudnn.benchmark = True
     on_tpu = args.device == 'tpu'
     if on_tpu:
         import torch_xla.core.xla_model as xm
