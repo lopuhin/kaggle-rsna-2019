@@ -53,6 +53,7 @@ def main():
         dataset,
         batch_size=args.batch_size,
         num_workers=args.workers,
+        drop_last=True,
     )
     model = getattr(models, args.model)()
     model.to(device)
