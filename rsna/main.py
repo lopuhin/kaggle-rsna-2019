@@ -40,7 +40,14 @@ def main():
     arg('--report-each', type=int, default=10)
     arg('--tpu-metrics', action='store_true')
     args = parser.parse_args()
+    if args.device == 'tpu':
+        import torch_xla.distributed.xla_multiprocessing as xmp
+        xmp.spawn(_worker, args=(args))
+    else:
+        _worker(args)
 
+
+def _worker(args):
     if args.device == 'cuda':
         torch.backends.cudnn.benchmark = True
     on_tpu = args.device == 'tpu'
@@ -58,6 +65,11 @@ def main():
         num_workers=args.workers,
         drop_last=True,
     )
+    if on_tpu:
+        import torch_xla.distributed.parallel_loader as pl
+        para_loader = pl.ParallelLoader(loader, [device])
+        loader = para_loader.per_device_loader(device)
+
     model = getattr(models, args.model)()
     model.to(device)
     criterion = nn.CrossEntropyLoss()
@@ -73,9 +85,10 @@ def main():
             loss = criterion(y_pred, y)
             optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
             if on_tpu:
-                xm.optimizer_step(optimizer, barrier=True)
+                xm.optimizer_step(optimizer)
+            else:
+                optimizer.step()
             if i % args.report_each == 0:
                 pbar.set_postfix(loss=f'{loss:.4f}')
 
