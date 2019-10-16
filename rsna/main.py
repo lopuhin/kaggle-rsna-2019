@@ -31,6 +31,7 @@ def main():
     arg('--image-size', type=lambda x: tuple(x.split('x')), default=(512, 512))
     arg('--epoch-size', type=int, default=10000)
     arg('--workers', type=int, default=2)
+    arg('--report-each', type=int, default=10)
     args = parser.parse_args()
 
     on_tpu = args.device == 'tpu'
@@ -57,13 +58,14 @@ def main():
     for i, (x, y) in enumerate(pbar):
         x = x.to(device)
         y = y.to(device)
-        optimizer.zero_grad()
         y_pred = model(x)
         loss = criterion(y_pred, y)
+        optimizer.zero_grad()
         loss.backward()
+        optimizer.step()
         if on_tpu:
             xm.optimizer_step(optimizer, barrier=True)
-        if i % 10 == 0:
+        if i % args.report_each == 0:
             pbar.set_postfix(loss=f'{loss:.4f}')
 
 
