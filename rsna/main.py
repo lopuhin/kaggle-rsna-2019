@@ -25,6 +25,7 @@ def main():
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
     arg('--model', default='resnet50')
+    arg('--device', default='cpu', choices=['cpu', 'cuda'])
     arg('--lr', type=float, default=0.01)
     arg('--batch-size', type=int, default=16)
     arg('--image-size', type=lambda x: tuple(x.split('x')), default=(512, 512))
@@ -32,6 +33,7 @@ def main():
     arg('--workers', type=int, default=2)
     args = parser.parse_args()
 
+    device = torch.device(args.device)
     dataset = Dataset(size=args.image_size, n=args.epoch_size)
     loader = torch.utils.data.DataLoader(
         dataset,
@@ -39,12 +41,15 @@ def main():
         num_workers=args.workers,
     )
     model = getattr(models, args.model)()
+    model.to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
 
     model.train()
     pbar = tqdm.tqdm(loader)
     for i, (x, y) in enumerate(pbar):
+        x = x.to(device)
+        y = y.to(device)
         optimizer.zero_grad()
         y_pred = model(x)
         loss = criterion(y_pred, y)
