@@ -15,7 +15,7 @@ def main():
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
     arg('--model', default='resnet50')
-    arg('--device', default='cpu', choices=['cpu', 'cuda', 'tpu'])
+    arg('--device', default='tpu', choices=['cpu', 'cuda', 'tpu'])
     arg('--lr', type=float, default=0.001)
     arg('--batch-size', type=int, default=16)
     arg('--workers', type=int, default=1)
