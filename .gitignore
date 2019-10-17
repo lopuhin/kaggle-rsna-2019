@@ -1,3 +1,4 @@
-/rsna.egg-info/
+/rsna.egg-info
 /data
 __pycache__
+.ipynb_checkpoints
