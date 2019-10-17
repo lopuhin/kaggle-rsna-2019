@@ -1,29 +1,12 @@
 import argparse
-import random
-from typing import Tuple
 
 import torch
 from torch import nn, optim
 import torch.utils.data
 from torchvision import models
 
-
-class Dataset(torch.utils.data.Dataset):
-    def __init__(self, size: Tuple[int, int], n: int):
-        self.size = size
-        self.n = n
-
-    def __len__(self):
-        return self.n
-
-    def __getitem__(self, idx):
-        w, h = self.size
-        x = torch.randn(3, h, w, dtype=torch.float32)
-        y = random.randint(0, 100)
-        x0 = (y % 10) * (w // 10)
-        y0 = (y // 10) * (h // 10)
-        x[:, y0: y0 + h // 10, x0: x0 + w // 10] = 1
-        return x, y
+from .dataset import Dataset
+from .data_utils import load_train_df, TRAIN_ROOT, CLASSES
 
 
 def main():
@@ -33,8 +16,6 @@ def main():
     arg('--device', default='cpu', choices=['cpu', 'cuda', 'tpu'])
     arg('--lr', type=float, default=0.001)
     arg('--batch-size', type=int, default=16)
-    arg('--image-size', type=lambda x: tuple(x.split('x')), default=(512, 512))
-    arg('--epoch-size', type=int, default=10000)
     arg('--workers', type=int, default=2)
     arg('--report-each', type=int, default=10)
     arg('--tpu-metrics', action='store_true')
@@ -58,7 +39,12 @@ def _worker(index, args):
         device = torch.device(args.device)
     print(f'using device {device}')
 
-    dataset = Dataset(size=args.image_size, n=args.epoch_size)
+    train_df = load_train_df()
+    # limit to the part which is already loaded
+    present_ids = {p.stem for p in TRAIN_ROOT.glob('*.dcm')}
+    train_df = train_df[train_df['Image'].isin(present_ids)]
+    dataset = Dataset(df=train_df, root=TRAIN_ROOT)
+    print(f'{len(dataset):,} items in train')
     loader = torch.utils.data.DataLoader(
         dataset,
         batch_size=args.batch_size,
@@ -66,9 +52,10 @@ def _worker(index, args):
         drop_last=True,
     )
 
-    model = getattr(models, args.model)()
+    model = getattr(models, args.model)(pretrained=True)
+    model.fc = nn.Linear(model.fc.in_features, len(CLASSES))
     model.to(device)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
 
     def train():

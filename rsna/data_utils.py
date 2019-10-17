@@ -11,6 +11,7 @@ import pydicom
 
 
 ROOT = Path(__file__).parent.parent / 'data'
+TRAIN_ROOT = ROOT / 'stage_1_train_images'
 WINDOW_CONFIG = {
     # center, width
     'brain': (40, 80),

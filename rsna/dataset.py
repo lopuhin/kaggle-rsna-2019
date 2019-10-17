@@ -23,5 +23,5 @@ class Dataset(torch.utils.data.Dataset):
         data = read_dicom(self.root / f'{item.Image}.dcm')
         inputs = get_inputs(data, keys=self.WINDOWS)
         image = np.stack([inputs[key] for key in self.WINDOWS])
-        target = np.array([item[cls] for cls in CLASSES])
+        target = np.array([item[cls] for cls in CLASSES], dtype=np.float32)
         return torch.from_numpy(image), torch.from_numpy(target)
