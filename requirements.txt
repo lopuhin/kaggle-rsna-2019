@@ -1,5 +1,5 @@
 albumentations==0.4.0
-attrs=19.3.0
+attrs==19.3.0
 imageio==2.6.1
 imgaug==0.2.6
 kiwisolver==1.1.0
