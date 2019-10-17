@@ -20,8 +20,3 @@ Export env variable (check TPU address if different form 172.16.0.2)::
 
     export XRT_TPU_CONFIG="tpu_worker;0;172.16.0.2:8470"
 
-Run official tests::
-
-    cd tpu-tests
-    python test_train_mnist.py
-    python test_train_mp_mnist.py
