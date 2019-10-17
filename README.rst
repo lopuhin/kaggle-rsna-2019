@@ -14,6 +14,10 @@ if you want to try using TPU yourself.
 TPU installation notes
 ----------------------
 
+Make sure to use a VM which is large enough, at least
+``n1-standard-16`` to not be VM compute/network bound
+(also you can run out of memory on a smaller VM).
+
 Check installation options at https://github.com/pytorch/xla
 
 Alternatively, you can start a VM with Ubuntu 18.04 and install
