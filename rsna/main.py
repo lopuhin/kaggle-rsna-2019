@@ -22,14 +22,16 @@ def main():
     arg('--report-each', type=int, default=100)
     arg('--tpu-metrics', action='store_true')
     args = parser.parse_args()
+
+    train_df = load_train_df()  # do initial load in one process only
     if args.device == 'tpu':
         import torch_xla.distributed.xla_multiprocessing as xmp
-        xmp.spawn(_worker, args=(args,))
+        xmp.spawn(_worker, args=(args, train_df))
     else:
-        _worker(0, args)
+        _worker(0, args, train_df)
 
 
-def _worker(worker_index, args):
+def _worker(worker_index, args, train_df):
     if args.device == 'cuda':
         torch.backends.cudnn.benchmark = True
     on_tpu = args.device == 'tpu'
@@ -41,7 +43,6 @@ def _worker(worker_index, args):
         device = torch.device(args.device)
     print(f'using device {device}')
 
-    train_df = load_train_df()
     # limit to the part which is already loaded
     present_ids = {p.stem for p in TRAIN_ROOT.glob('*.dcm')}
     train_df = train_df[train_df['Image'].isin(present_ids)]
