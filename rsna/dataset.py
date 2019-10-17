@@ -10,16 +10,19 @@ import torch.utils.data
 from .data_utils import read_dicom, get_inputs, CLASSES
 
 
+cv2.setNumThreads(1)
+
+
 def build_transform():
     return A.Compose([
-       #A.ShiftScaleRotate(
-       #    rotate_limit=15,
-       #    border_mode=cv2.BORDER_CONSTANT,
-       #    value=0,
-       #    p=1.0,
-       #    interpolation=cv2.INTER_NEAREST,
-       #),
-        A.Resize(512, 512),  # FIXME
+        A.ShiftScaleRotate(
+            rotate_limit=15,
+            border_mode=cv2.BORDER_CONSTANT,
+            value=0,
+            p=1.0,
+            interpolation=cv2.INTER_NEAREST,
+        ),
+        A.Resize(512, 512),  # FIXME  some images are smaller
         A.HorizontalFlip(),
         A.RandomCrop(448, 448),
     ])
