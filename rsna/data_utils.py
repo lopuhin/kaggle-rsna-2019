@@ -51,7 +51,6 @@ def get_inputs(data, keys: List[str] = None) -> Dict[str, np.ndarray]:
 
 def load_train_df(path: Path = ROOT / 'stage_1_train.csv'):
     cached_path = path.parent / (path.name + '.pkl')
-    print(cached_path)
     if cached_path.exists():
         return pd.read_pickle(cached_path)
     else:
