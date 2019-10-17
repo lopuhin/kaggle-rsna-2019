@@ -25,12 +25,13 @@ Assuming Ubuntu 18.04, install packages::
 
 Install wheels for torch xla 0.5, you can copy them with ``gsutil cp``:
 
-- gs://tpu-pytorch/wheels/torch-0.5-cp36-cp36m-linux_x86_64.whl
-- gs://tpu-pytorch/wheels/torch_xla-0.5-cp36-cp36m-linux_x86_64.whl
-- gs://tpu-pytorch/wheels/torchvision-0.3.0-cp36-cp36m-linux_x86_64.whl
+- ``gs://tpu-pytorch/wheels/torch-0.5-cp36-cp36m-linux_x86_64.whl``
+- ``gs://tpu-pytorch/wheels/torch_xla-0.5-cp36-cp36m-linux_x86_64.whl``
+- ``gs://tpu-pytorch/wheels/torchvision-0.3.0-cp36-cp36m-linux_x86_64.whl``
 
-Create TPU node using pytorch-0.5 version (double-check zone and size),
-use e.g. 172.16.0.0 as IP mask.
+Create TPU node using pytorch-0.5 version (double-check zone and size,
+also VM should be in the same zone), use e.g. 172.16.0.0 as IP mask.
+Code was tested with TPU-v2 so far, but should work with TPU-v3 as well.
 
 Export env variable (check TPU address if different form 172.16.0.2)::
 
