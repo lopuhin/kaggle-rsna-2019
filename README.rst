@@ -6,11 +6,70 @@ See https://www.kaggle.com/c/rsna-intracranial-hemorrhage-detection/
 This is a very simple pipeline, my main goal was to check if
 Pytorch TPU support is good enough for classification.
 
+.. warning::
+
+    This is not a complete pipeline yet.
+
 This is no substitute for reading the docs, I recommend checking
 https://github.com/pytorch/xla and reading through
 https://github.com/pytorch/xla/blob/master/API_GUIDE.md
 if you want to try using TPU yourself.
 
+Performance
+-----------
+
+Tested on:
+- 2080ti with AMD Ryzen 7 3700X 8-Core Processor, in float32
+- TPUv2 with n1-standard-16 VM
+
+Input resolution is 448x448, optimizer is SGD.
+
+======  ==========  ==========  ===========  ========  =======
+Device  Network     Batch size  s per batch  images/s  speedup
+======  ==========  ==========  ===========  ========  =======
+TPUv2   resnet50    16x8        0.289        443       6.26
+2080ti  resnet50    16          0.226        71        1.00
+------  ----------  ----------  -----------  --------  -------
+TPUv2   resnet50    24x8        0.392        490       7.12
+2080ti  resnet50    24          0.349        69        1.00
+======  ==========  ==========  ===========  ========  =======
+
+TODO:
+
+- [ ] 2080ti on float16
+- [ ] heavier models
+- [ ] TPUv3
+
+Note: I'm not 100% sure yet if I'm bottlenecked by network or CPU,
+checking heavier models should settle this.
+
+Overall impressions
+-------------------
+
+So far working with TPU looks very similar to working with a multi-GPU with
+distributed data parallel - it needs about the same amount of modifications,
+maybe even smaller, at least when all ops are supported and shapes are static,
+like it is for a simple classifications task.
+It also needs an efficient data pipeline and
+a powerful machine to feed all 8 TPU core,
+similar to what you'd need for an 8-GPU machine.
+So far I didn't see any strange hangs or stability issues.
+
+In terms of the API, what I really like about pytorch TPU support:
+
+- you can use any pytorch models as long as all ops are supported, you don't
+  need to convert any weights to/from TPU
+- TPU-specicif API is quite small and clear:
+  https://github.com/pytorch/xla/blob/master/API_GUIDE.md
+- you can use the same data pipeline as for a regular GPU
+
+With TF, recommended approach is to prepare and feed TFRecords which are read
+by the TPU from Google Cloud Storage. On one hand, it looks much less convenient
+for quick development and prototyping (e.g. probably you won't be able to use
+you favorite augmentations library). On the other hand, you don't need
+a powerful machine to feed the data.
+
+In terms of price effectiveness.
 TPU installation notes
 ----------------------
 
@@ -62,3 +121,8 @@ Place competitiono data into ``./data`` folder::
 Run training (TPU is used by default, single-GPU is also supported via ``--device=cuda``)::
 
     python -m rsna.main
+
+License
+-------
+
+License is MIT.
