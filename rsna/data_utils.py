@@ -8,6 +8,7 @@ import attr
 import numpy as np
 import pandas as pd
 import pydicom
+import tqdm
 
 
 ROOT = Path(__file__).parent.parent / 'data'
@@ -29,8 +30,8 @@ CLASSES = [
 ]
 
 
-def read_dicom(path: Path):
-    return pydicom.read_file(str(path))
+def read_dicom(path: Path, only_meta=False):
+    return pydicom.read_file(str(path), stop_before_pixels=only_meta)
 
 
 def get_inputs(data, keys: List[str] = None) -> Dict[str, np.ndarray]:
@@ -49,18 +50,27 @@ def get_inputs(data, keys: List[str] = None) -> Dict[str, np.ndarray]:
     }
 
 
-def load_train_df(path: Path = ROOT / 'stage_1_train.csv'):
-    cached_path = path.parent / (path.name + '.pkl')
+def load_train_df():
+    cached_path = ROOT / 'stage_1_train.pkl'
     if cached_path.exists():
         return pd.read_pickle(cached_path)
     else:
-        df = pd.read_csv(path)
+        print('Generating cached train dataframe')
+        meta_by_image_id = {}
+        for path in tqdm.tqdm(list(TRAIN_ROOT.glob('*.dcm'))):
+            meta = read_dicom(path, only_meta=True)
+            meta_by_image_id[path.stem] = {
+                'patient_id': meta[('0010', '0020')].value,
+            }
+        df = pd.read_csv(ROOT / 'stage_1_train.csv')
         df[['ID', 'Image', 'Diagnosis']] = df['ID'].str.split('_', expand=True)
         df = df[['Image', 'Diagnosis', 'Label']]
         df = df.drop_duplicates()
         df = df.pivot(index='Image', columns='Diagnosis', values='Label')
         df = df.reset_index()
         df['Image'] = 'ID_' + df['Image']
+        df['Patient'] = df['Image'].apply(
+            lambda image_id: meta_by_image_id[image_id]['patient_id'])
         df.to_pickle(cached_path)
         return df
 
