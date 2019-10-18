@@ -6,7 +6,8 @@ See https://www.kaggle.com/c/rsna-intracranial-hemorrhage-detection/
 This is a very simple pipeline, my main goal was to check if
 Pytorch TPU support is good enough for classification.
 
-**WARNING:** this is not a complete pipeline yet.
+**WARNING:** this is not a complete pipeline yet, only training
+"works" (loss is going down, nothing checked yet).
 
 I recommend checking
 https://github.com/pytorch/xla and reading through
@@ -28,16 +29,16 @@ Device  Network     Batch size  s/batch  images/s  speedup
 ======  ==========  ==========  =======  ========  =======
 TPUv2   resnet50    16x8        0.289    443       6.26
 2080ti  resnet50    16          0.226    71        1.00
-======  ==========  ==========  =======  ========  =======
+------  ----------  ----------  -------  --------  -------
 TPUv2   resnet50    24x8        0.392    490       7.12
 2080ti  resnet50    24          0.349    69        1.00
 ======  ==========  ==========  =======  ========  =======
 
 TODO:
 
-[ ] 2080ti in float16
-[ ] heavier models
-[ ] TPUv3
+- 2080ti in float16
+- heavier models
+- TPUv3
 
 Note: I'm not 100% sure yet if I'm bottlenecked by network or CPU,
 checking heavier models should settle this.
