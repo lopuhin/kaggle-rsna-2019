@@ -6,11 +6,9 @@ See https://www.kaggle.com/c/rsna-intracranial-hemorrhage-detection/
 This is a very simple pipeline, my main goal was to check if
 Pytorch TPU support is good enough for classification.
 
-.. warning::
+**WARNING:** this is not a complete pipeline yet.
 
-    This is not a complete pipeline yet.
-
-This is no substitute for reading the docs, I recommend checking
+I recommend checking
 https://github.com/pytorch/xla and reading through
 https://github.com/pytorch/xla/blob/master/API_GUIDE.md
 if you want to try using TPU yourself.
@@ -19,26 +17,27 @@ Performance
 -----------
 
 Tested on:
+
 - 2080ti with AMD Ryzen 7 3700X 8-Core Processor, in float32
 - TPUv2 with n1-standard-16 VM
 
 Input resolution is 448x448, optimizer is SGD.
 
-======  ==========  ==========  ===========  ========  =======
-Device  Network     Batch size  s per batch  images/s  speedup
-======  ==========  ==========  ===========  ========  =======
-TPUv2   resnet50    16x8        0.289        443       6.26
-2080ti  resnet50    16          0.226        71        1.00
-------  ----------  ----------  -----------  --------  -------
-TPUv2   resnet50    24x8        0.392        490       7.12
-2080ti  resnet50    24          0.349        69        1.00
-======  ==========  ==========  ===========  ========  =======
+======  ==========  ==========  =======  ========  =======
+Device  Network     Batch size  s/batch  images/s  speedup
+======  ==========  ==========  =======  ========  =======
+TPUv2   resnet50    16x8        0.289    443       6.26
+2080ti  resnet50    16          0.226    71        1.00
+======  ==========  ==========  =======  ========  =======
+TPUv2   resnet50    24x8        0.392    490       7.12
+2080ti  resnet50    24          0.349    69        1.00
+======  ==========  ==========  =======  ========  =======
 
 TODO:
 
-- [ ] 2080ti on float16
-- [ ] heavier models
-- [ ] TPUv3
+[ ] 2080ti in float16
+[ ] heavier models
+[ ] TPUv3
 
 Note: I'm not 100% sure yet if I'm bottlenecked by network or CPU,
 checking heavier models should settle this.
@@ -69,7 +68,10 @@ for quick development and prototyping (e.g. probably you won't be able to use
 you favorite augmentations library). On the other hand, you don't need
 a powerful machine to feed the data.
 
-In terms of price effectiveness.
+In terms of price effectiveness, it's a hard call and depends very much on
+how much does TPU cost you and where can you rent GPUs. I also didn't check
+preemptible TPUs yet.
+
 TPU installation notes
 ----------------------
 
