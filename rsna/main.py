@@ -51,7 +51,7 @@ def _worker(worker_index, args, train_df):
     else:
         device = torch.device(args.device)
     print(f'using device {device}')
-    if on_tpu and not xm.is_master_ordinal():
+    if on_tpu:  # FIXME and not xm.is_master_ordinal():
         writer = None
     else:
         writer = SummaryWriter(comment=args.comment, flush_secs=10)
