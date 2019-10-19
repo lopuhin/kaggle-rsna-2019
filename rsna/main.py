@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from torch import nn, optim
 import torch.utils.data
+from torch.utils.tensorboard import SummaryWriter
 from torchvision import models
 
 from .dataset import Dataset
@@ -26,6 +27,7 @@ def main():
     arg('--epochs', type=int, default=10)
     arg('--epoch-steps', type=int)
     arg('--valid-steps', type=int)
+    arg('--comment', default='', help='postfix for tensorboard run folder')
     args = parser.parse_args()
 
     train_df = load_train_df()  # do initial load in one process only
@@ -37,6 +39,7 @@ def main():
 
 
 def _worker(worker_index, args, train_df):
+    writer = SummaryWriter(comment=args.comment, flush_secs=10)
     if args.device == 'cuda':
         torch.backends.cudnn.benchmark = True
     on_tpu = args.device == 'tpu'
@@ -108,6 +111,7 @@ def _worker(worker_index, args, train_df):
             data_t0 = time.perf_counter()
             compute_times.append(data_t0 - t0)
             if step % args.report_each == 0:
+                writer.add_scalar('loss/train', loss, step)
                 print(
                     f'[worker {worker_index}]',
                     f'training step {step:,}/{epoch_steps * args.epochs:,}',
@@ -141,7 +145,9 @@ def _worker(worker_index, args, train_df):
                         f'loss={np.mean(losses):.4f}')
                 if i >= valid_steps - 1:
                     break
-            print(f'loss at step {step}: {np.mean(losses):.4f}')
+            loss = np.mean(losses)
+            writer.add_scalar('loss/valid', loss, step)
+            print(f'loss at step {step}: {loss:.4f}')
 
     try:
         for _ in range(args.epochs):
