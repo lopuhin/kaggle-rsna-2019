@@ -8,6 +8,7 @@ import attr
 import numpy as np
 import pandas as pd
 import pydicom
+from sklearn.model_selection import GroupKFold
 import tqdm
 
 
@@ -75,6 +76,14 @@ def load_train_df():
         return df
 
 
+def train_valid_split(df: pd.DataFrame, fold: int, n_folds: int):
+    cv = GroupKFold(n_splits=n_folds)
+    for i, (train_ids, valid_ids) in enumerate(
+            cv.split(df, groups=df['Patient'])):
+        if i == fold:
+            return df.iloc[train_ids], df.iloc[valid_ids]
+
+
 @attr.s(auto_attribs=True)
 class Window:
     center: int
@@ -86,8 +95,6 @@ class Window:
 def _int_of_first(x) -> int:
     value = x.value
     if isinstance(value, pydicom.multival.MultiValue):
-        if len(set(value)) != 1:
-            print('ignoring multi-value', x)
         value = value[0]
     return int(value)
 

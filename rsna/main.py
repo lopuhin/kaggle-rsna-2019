@@ -8,7 +8,7 @@ import torch.utils.data
 from torchvision import models
 
 from .dataset import Dataset
-from .data_utils import load_train_df, TRAIN_ROOT, CLASSES
+from .data_utils import load_train_df, TRAIN_ROOT, CLASSES, train_valid_split
 
 
 def main():
@@ -21,6 +21,11 @@ def main():
     arg('--workers', type=int, default=2)
     arg('--report-each', type=int, default=100)
     arg('--tpu-metrics', action='store_true')
+    arg('--fold', type=int, default=0)
+    arg('--n-folds', type=int, default=5)
+    arg('--epochs', type=int, default=10)
+    arg('--epoch-steps', type=int)
+    arg('--valid-steps', type=int)
     args = parser.parse_args()
 
     train_df = load_train_df()  # do initial load in one process only
@@ -43,17 +48,31 @@ def _worker(worker_index, args, train_df):
         device = torch.device(args.device)
     print(f'using device {device}')
 
-    # limit to the part which is already loaded
+    # limit to the part which is already loaded - FIXME
     present_ids = {p.stem for p in TRAIN_ROOT.glob('*.dcm')}
     train_df = train_df[train_df['Image'].isin(present_ids)]
-    dataset = Dataset(df=train_df, root=TRAIN_ROOT)
-    print(f'{len(dataset):,} items in train')
-    loader = torch.utils.data.DataLoader(
-        dataset,
+    train_df, valid_df = train_valid_split(
+        train_df, fold=args.fold, n_folds=args.n_folds)
+    train_dataset = Dataset(df=train_df, root=TRAIN_ROOT)
+    valid_dataset = Dataset(df=valid_df, root=TRAIN_ROOT)
+    print(f'{len(train_dataset):,} items in train, '
+          f'{len(valid_dataset):,} items in valid')
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=args.batch_size,
+        num_workers=args.workers,
+        shuffle=True,
+        drop_last=True,
+    )
+    epoch_steps = args.epoch_steps or len(train_loader)  # FIXME TPU?
+    print(f'epoch size {epoch_steps:,}')
+    valid_loader = torch.utils.data.DataLoader(
+        valid_dataset,
         batch_size=args.batch_size,
         num_workers=args.workers,
         drop_last=True,
     )
+    valid_steps = args.valid_steps or len(valid_loader)
 
     model = getattr(models, args.model)(pretrained=True)
     model.fc = nn.Linear(model.fc.in_features, len(CLASSES))
@@ -64,26 +83,19 @@ def _worker(worker_index, args, train_df):
 
     def train():
         nonlocal step
-
         model.train()
-        if on_tpu:
-            import torch_xla.distributed.parallel_loader as pl
-            para_loader = pl.ParallelLoader(loader, [device])
-            # would need enumerate in xla>0.5
-            i_loader = para_loader.per_device_loader(device)
-        else:
-            i_loader = enumerate(loader)
-
         total_times, data_times, compute_times = [], [], []
         data_t0 = t0 = time.perf_counter()
-        for i, (x, y) in i_loader:
+        for i, (x, y) in enumerate(
+                _iter_loader(train_loader, device, on_tpu=on_tpu)):
             _t0 = time.perf_counter()
             data_times.append(_t0 - data_t0)
             total_times.append(_t0 - t0)
             t0 = _t0
 
-            x = x.to(device)
-            y = y.to(device)
+            if not on_tpu:
+                x = x.to(device)
+                y = y.to(device)
             y_pred = model(x)
             loss = criterion(y_pred, y)
             optimizer.zero_grad()
@@ -95,10 +107,10 @@ def _worker(worker_index, args, train_df):
 
             data_t0 = time.perf_counter()
             compute_times.append(data_t0 - t0)
-            if i % args.report_each == 0:
+            if step % args.report_each == 0:
                 print(
                     f'[worker {worker_index}]',
-                    f'step={step:,}',
+                    f'training step {step:,}/{epoch_steps * args.epochs:,}',
                     f'loss={loss:.4f}',
                     f'data_time={np.mean(data_times):.3f}',
                     f'compute_time={np.mean(compute_times):.3f}',
@@ -108,9 +120,33 @@ def _worker(worker_index, args, train_df):
                 compute_times.clear()
                 total_times.clear()
             step += 1
+            if i >= epoch_steps - 1:
+                break
+
+    def evaluate():
+        model.eval()
+        with torch.no_grad():
+            losses = []
+            for i, (x, y) in enumerate(
+                    _iter_loader(valid_loader, device, on_tpu=on_tpu)):
+                if not on_tpu:
+                    x = x.to(device)
+                    y = y.to(device)
+                y_pred = model(x)
+                losses.append(float(criterion(y_pred, y)))  # FIXME TPU speed
+                if i % args.report_each == 0:
+                    print(
+                        f'[worker {worker_index}]',
+                        f'evaluation step {i:,}/{valid_steps:,}',
+                        f'loss={np.mean(losses):.4f}')
+                if i >= valid_steps - 1:
+                    break
+            print(f'loss at step {step}: {np.mean(losses):.4f}')
 
     try:
-        train()
+        for _ in range(args.epochs):
+            train()
+            evaluate()
     except KeyboardInterrupt:
         print('Ctrl+C pressed, interrupting...')
     finally:
@@ -118,6 +154,16 @@ def _worker(worker_index, args, train_df):
             import torch_xla.debug.metrics as met
             print('\nTPU metrics report:')
             print(met.metrics_report())
+
+
+def _iter_loader(loader, device, on_tpu):
+    if on_tpu:
+        import torch_xla.distributed.parallel_loader as pl
+        para_loader = pl.ParallelLoader(loader, [device])
+        # would not be needed in xla>0.5
+        return (xy for _, xy in para_loader.per_device_loader(device))
+    else:
+        return iter(loader)
 
 
 if __name__ == '__main__':
