@@ -25,25 +25,29 @@ Tested on:
 Input resolution is 448x448, optimizer is SGD.
 ``amp 01`` below stands for 01 level in apex amp (automatic mixed precision).
 
-======  =========  ==========  ==========  =======  ========  =======
-Device  Precision  Network     Batch size  s/batch  images/s  speedup
-======  =========  ==========  ==========  =======  ========  =======
-TPUv2   float32?   resnet50    16x8        0.289    443       6.26
-2080ti  float32    resnet50    16          0.226    71        1.00
-------  ---------  ---------   ----------  -------  --------  -------
-TPUv2   float32?   resnet50    24x8        0.392    490       4.67
-2080ti  float32    resnet50    24          0.349    69        0.65
-2080ti  amp O1     resnet50    24          0.228    105       1.00
-======  =========  ==========  ==========  =======  ========  =======
+======  =========  ==========  ==========  =======  ========
+Device  Precision  Network     Batch size  s/batch  images/s
+======  =========  ==========  ==========  =======  ========
+TPUv2   float32    resnet50    16x8        0.289    443
+2080ti  float32    resnet50    16          0.226    71
+TPUv2   float32    resnet50    24x8        0.392    490
+2080ti  float32    resnet50    24          0.349    69
+2080ti  amp O1     resnet50    24          0.228    105
+2080ti  amp O1     resnet50    32          0.285    112
+TPUv2   bfloat16   resnet50    24x8        0.342    561
+------  ---------  ---------   ----------  -------  --------
+2080ti  amp O1     resnet101   24          0.356    67
+TPUv2   float32    resnet101   24x8        0.514    236
+TPUv2   bfloat16   resnet101   24x8        0.514    374
+======  =========  ==========  ==========  =======  ========
 
 TODO:
 
-- bfloat on TPU
+- max batch sizes
 - heavier models
 - TPUv3
 
-Note: I'm not 100% sure yet if I'm bottlenecked by network or CPU,
-checking heavier models should settle this.
+Note: resnet50 is definitely either I/O or CPU bound or both.
 
 Overall impressions
 -------------------
@@ -104,6 +108,10 @@ Code was tested with TPU-v2 so far, but should work with TPU-v3 as well.
 Export env variable (check TPU address if different form 172.16.0.2)::
 
     export XRT_TPU_CONFIG="tpu_worker;0;172.16.0.2:8470"
+
+And also enable bfloat16::
+
+    export XLA_USE_BF16=1
 
 General installation
 --------------------
