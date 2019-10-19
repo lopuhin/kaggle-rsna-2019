@@ -54,7 +54,7 @@ def get_inputs(data, keys: List[str] = None) -> Dict[str, np.ndarray]:
 def load_train_df():
     cached_path = ROOT / 'stage_1_train.pkl'
     if cached_path.exists():
-        return pd.read_pickle(cached_path)
+        df = pd.read_pickle(cached_path)
     else:
         print('Generating cached train dataframe')
         meta_by_image_id = {}
@@ -73,7 +73,8 @@ def load_train_df():
         df['Patient'] = df['Image'].apply(
             lambda image_id: meta_by_image_id[image_id]['patient_id'])
         df.to_pickle(cached_path)
-        return df
+    df = df[df['Image'] != 'ID_6431af929']
+    return df
 
 
 def train_valid_split(df: pd.DataFrame, fold: int, n_folds: int):
