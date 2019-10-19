@@ -51,9 +51,6 @@ def _worker(worker_index, args, train_df):
         device = torch.device(args.device)
     print(f'using device {device}')
 
-    # limit to the part which is already loaded - FIXME
-    present_ids = {p.stem for p in TRAIN_ROOT.glob('*.dcm')}
-    train_df = train_df[train_df['Image'].isin(present_ids)]
     train_df, valid_df = train_valid_split(
         train_df, fold=args.fold, n_folds=args.n_folds)
     train_dataset = Dataset(df=train_df, root=TRAIN_ROOT)
