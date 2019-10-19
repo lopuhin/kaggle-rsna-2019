@@ -28,6 +28,8 @@ def main():
     arg('--epoch-steps', type=int)
     arg('--valid-steps', type=int)
     arg('--comment', default='', help='postfix for tensorboard run folder')
+    arg('--amp', action='store_true', help='use mixed precision with apex.amp')
+    arg('--amp-level', default='O1', help='opt_level for apex.amp')
     args = parser.parse_args()
 
     train_df = load_train_df()  # do initial load in one process only
@@ -79,6 +81,12 @@ def _worker(worker_index, args, train_df):
     model.to(device)
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
+    if args.amp:
+        if on_tpu:
+            raise ValueError('--amp not supported with TPU')
+        import apex.amp
+        model, optimizer = apex.amp.initialize(
+            model, optimizer, opt_level=args.amp_level)
     step = 0
 
     def train():
@@ -93,7 +101,11 @@ def _worker(worker_index, args, train_df):
             y_pred = model(x)
             loss = criterion(y_pred, y)
             optimizer.zero_grad()
-            loss.backward()
+            if args.amp:
+                with apex.amp.scale_loss(loss, optimizer) as scaled_loss:
+                    scaled_loss.backward()
+            else:
+                loss.backward()
             if on_tpu:
                 xm.optimizer_step(optimizer)
             else:
