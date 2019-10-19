@@ -17,7 +17,7 @@ def main():
     arg = parser.add_argument
     arg('--model', default='resnet50')
     arg('--device', default='tpu', choices=['cpu', 'cuda', 'tpu'])
-    arg('--lr', type=float, default=0.001)
+    arg('--lr', type=float, default=0.005)
     arg('--batch-size', type=int, default=24)
     arg('--workers', type=int, default=2)
     arg('--report-each', type=int, default=100)
