@@ -1,4 +1,5 @@
 from pathlib import Path
+import sys
 
 import albumentations as A
 import cv2
@@ -41,8 +42,12 @@ class Dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         item = self.df.iloc[idx]
-        data = read_dicom(self.root / f'{item.Image}.dcm')
-        inputs = get_inputs(data, keys=self.WINDOWS)
+        try:
+            data = read_dicom(self.root / f'{item.Image}.dcm')
+            inputs = get_inputs(data, keys=self.WINDOWS)
+        except Exception:
+            print(f'error reading item {item.Image}', file=sys.stderr)
+            raise
         image = np.stack([inputs[key] for key in self.WINDOWS])
         image = np.rollaxis(image, 0, 3)
         image = self.transform(image=image)['image']
