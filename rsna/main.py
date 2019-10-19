@@ -87,14 +87,8 @@ def _worker(worker_index, args, train_df):
     def train():
         nonlocal step
         model.train()
-        total_times, data_times, compute_times = [], [], []
-        data_t0 = t0 = time.perf_counter()
-        for i, (x, y) in enumerate(
-                _iter_loader(train_loader, device, on_tpu=on_tpu)):
-            _t0 = time.perf_counter()
-            data_times.append(_t0 - data_t0)
-            total_times.append(_t0 - t0)
-            t0 = _t0
+        for i, ((x, y), times) in enumerate(_timed_loop(
+                _iter_loader(train_loader, device, on_tpu=on_tpu))):
 
             if not on_tpu:
                 x = x.to(device)
@@ -108,21 +102,15 @@ def _worker(worker_index, args, train_df):
             else:
                 optimizer.step()
 
-            data_t0 = time.perf_counter()
-            compute_times.append(data_t0 - t0)
             if step % args.report_each == 0:
                 writer.add_scalar('loss/train', loss, step)
                 print(
                     f'[worker {worker_index}]',
                     f'training step {step:,}/{epoch_steps * args.epochs:,}',
                     f'loss={loss:.4f}',
-                    f'data_time={np.mean(data_times):.3f}',
-                    f'compute_time={np.mean(compute_times):.3f}',
-                    f'total_time={np.mean(total_times):.3f}',
+                    f'iter_time={np.mean(times):.3f}',
                 )
-                data_times.clear()
-                compute_times.clear()
-                total_times.clear()
+                times.clear()
             step += 1
             if i >= epoch_steps - 1:
                 break
@@ -131,8 +119,8 @@ def _worker(worker_index, args, train_df):
         model.eval()
         with torch.no_grad():
             losses = []
-            for i, (x, y) in enumerate(
-                    _iter_loader(valid_loader, device, on_tpu=on_tpu)):
+            for i, ((x, y), times) in enumerate(_timed_loop(
+                    _iter_loader(valid_loader, device, on_tpu=on_tpu))):
                 if not on_tpu:
                     x = x.to(device)
                     y = y.to(device)
@@ -142,7 +130,9 @@ def _worker(worker_index, args, train_df):
                     print(
                         f'[worker {worker_index}]',
                         f'evaluation step {i:,}/{valid_steps:,}',
-                        f'loss={np.mean(losses):.4f}')
+                        f'loss={np.mean(losses):.4f}',
+                        f'iter_time={np.mean(times):.3f}')
+                    times.clear()
                 if i >= valid_steps - 1:
                     break
             loss = np.mean(losses)
@@ -170,6 +160,16 @@ def _iter_loader(loader, device, on_tpu):
         return (xy for _, xy in para_loader.per_device_loader(device))
     else:
         return iter(loader)
+
+
+def _timed_loop(iterator):
+    times = []
+    t0 = time.perf_counter()
+    for x in iterator:
+        t1 = time.perf_counter()
+        times.append(t1 - t0)
+        t0 = t1
+        yield x, times
 
 
 if __name__ == '__main__':
