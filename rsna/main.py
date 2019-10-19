@@ -41,7 +41,6 @@ def main():
 
 
 def _worker(worker_index, args, train_df):
-    writer = SummaryWriter(comment=args.comment, flush_secs=10)
     if args.device == 'cuda':
         torch.backends.cudnn.benchmark = True
     on_tpu = args.device == 'tpu'
@@ -52,6 +51,10 @@ def _worker(worker_index, args, train_df):
     else:
         device = torch.device(args.device)
     print(f'using device {device}')
+    if on_tpu and not xm.is_master_ordinal():
+        writer = None
+    else:
+        writer = SummaryWriter(comment=args.comment, flush_secs=10)
 
     train_df, valid_df = train_valid_split(
         train_df, fold=args.fold, n_folds=args.n_folds)
@@ -59,14 +62,25 @@ def _worker(worker_index, args, train_df):
     valid_dataset = Dataset(df=valid_df, root=TRAIN_ROOT)
     print(f'{len(train_dataset):,} items in train, '
           f'{len(valid_dataset):,} items in valid')
+    if on_tpu:
+        world_size = xm.xrt_world_size()
+        train_sampler = torch.utils.data.distributed.DistributedSampler(
+            train_dataset,
+            num_replicas=world_size,
+            rank=xm.get_ordinal(),
+            shuffle=True)
+    else:
+        world_size = 1
+        train_sampler = None
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=args.batch_size,
         num_workers=args.workers,
-        shuffle=True,
+        shuffle=not train_sampler,
+        sampler=train_sampler,
         drop_last=True,
     )
-    epoch_steps = args.epoch_steps or len(train_loader)  # FIXME TPU?
+    epoch_steps = args.epoch_steps or len(train_loader)
     print(f'epoch size {epoch_steps:,}')
     valid_loader = torch.utils.data.DataLoader(
         valid_dataset,
@@ -80,7 +94,8 @@ def _worker(worker_index, args, train_df):
     model.fc = nn.Linear(model.fc.in_features, len(CLASSES))
     model.to(device)
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
+    lr = args.lr * world_size
+    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9)
     if args.amp:
         if on_tpu:
             raise ValueError('--amp not supported with TPU')
@@ -112,7 +127,8 @@ def _worker(worker_index, args, train_df):
                 optimizer.step()
 
             if step % args.report_each == 0:
-                writer.add_scalar('loss/train', loss, step)
+                if writer:
+                    writer.add_scalar('loss/train', loss, step)
                 print(
                     f'[worker {worker_index}]',
                     f'training step {step:,}/{epoch_steps * args.epochs:,}',
@@ -145,7 +161,8 @@ def _worker(worker_index, args, train_df):
                 if i >= valid_steps - 1:
                     break
             loss = np.mean(losses)
-            writer.add_scalar('loss/valid', loss, step)
+            if writer:
+                writer.add_scalar('loss/valid', loss, step)
             print(f'loss at step {step}: {loss:.4f}')
 
     try:

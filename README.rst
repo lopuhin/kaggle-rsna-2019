@@ -23,6 +23,7 @@ Tested on:
 - TPUv2 with n1-standard-16 VM
 
 Input resolution is 448x448, optimizer is SGD.
+``amp 01`` below stands for 01 level in apex amp (automatic mixed precision).
 
 ======  =========  ==========  ==========  =======  ========  =======
 Device  Precision  Network     Batch size  s/batch  images/s  speedup
