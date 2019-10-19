@@ -34,6 +34,7 @@ def main():
 
     train_df = load_train_df()  # do initial load in one process only
     if args.device == 'tpu':
+        build_model(args)  # to download weights only once
         import torch_xla.distributed.xla_multiprocessing as xmp
         xmp.spawn(_worker, args=(args, train_df))
     else:
@@ -90,8 +91,7 @@ def _worker(worker_index, args, train_df):
     )
     valid_steps = args.valid_steps or len(valid_loader)
 
-    model = getattr(models, args.model)(pretrained=True)
-    model.fc = nn.Linear(model.fc.in_features, len(CLASSES))
+    model = build_model(args)
     model.to(device)
     criterion = nn.BCEWithLogitsLoss()
     lr = args.lr * world_size
@@ -176,6 +176,12 @@ def _worker(worker_index, args, train_df):
             import torch_xla.debug.metrics as met
             print('\nTPU metrics report:')
             print(met.metrics_report())
+
+
+def build_model(args):
+    model = getattr(models, args.model)(pretrained=True)
+    model.fc = nn.Linear(model.fc.in_features, len(CLASSES))
+    return model
 
 
 def _iter_loader(loader, device, on_tpu):
