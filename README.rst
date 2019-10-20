@@ -35,7 +35,6 @@ TPUv2   float32    resnet50    24x8        0.392    490
 2080ti  amp O1     resnet50    24          0.228    105
 2080ti  amp O1     resnet50    32          0.285    112
 TPUv2   bfloat16   resnet50    24x8        0.342    561
-------  ---------  ---------   ----------  -------  --------
 2080ti  amp O1     resnet101   24          0.356    67
 TPUv2   float32    resnet101   24x8        0.514    236
 TPUv2   bfloat16   resnet101   24x8        0.514    374
